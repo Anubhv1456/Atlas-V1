@@ -15,6 +15,7 @@ import { isRevisionDue, isRevisionOverdue, daysOverdue } from '@/db/revisionEngi
 interface SystemCardProps {
   system: StudySystem;
   subjectName: string;
+  highlighted?: boolean;
 }
 
 // ── Circular progress ring ────────────────────────────────────────────────────
@@ -35,8 +36,9 @@ function ContentCircle({ pct }: { pct: number }) {
 }
 
 // ── SystemCard ────────────────────────────────────────────────────────────────
-export function SystemCard({ system, subjectName }: SystemCardProps) {
+export function SystemCard({ system, subjectName, highlighted }: SystemCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   // Content dialogs
   const [showInitDialog, setShowInitDialog]   = useState(false);
@@ -53,6 +55,14 @@ export function SystemCard({ system, subjectName }: SystemCardProps) {
   // Long-press detection for Content row
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLongPress    = useRef(false);
+
+  // ── Auto-expand + scroll when navigated from search ──────────────────────
+  useEffect(() => {
+    if (highlighted && cardRef.current) {
+      setExpanded(true);
+      setTimeout(() => cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 120);
+    }
+  }, [highlighted]);
 
   // ── Detect first full completion ──────────────────────────────────────────
   useEffect(() => {
@@ -157,10 +167,11 @@ export function SystemCard({ system, subjectName }: SystemCardProps) {
 
   return (
     <>
-      <div className={cn(
+      <div ref={cardRef} className={cn(
         'bg-card rounded-2xl border border-card-border shadow-sm overflow-hidden transition-all duration-300',
         revisionOverdue && 'border-destructive/50',
         revisionDue && !revisionOverdue && 'border-amber-400/50',
+        highlighted && 'ring-2 ring-primary ring-offset-2',
       )}>
         {/* Revision due banner */}
         {revisionDue && (

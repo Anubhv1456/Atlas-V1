@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, Link, useLocation } from 'wouter';
+import { useParams, Link, useLocation, useSearch } from 'wouter';
 import { useSubject, useSystemsBySubject, addSystem, updateSubject, deleteSubject } from '@/db/hooks';
 import { SystemCard } from '@/components/SystemCard';
 import { AddDialog } from '@/components/AddDialog';
@@ -21,6 +21,7 @@ const STAGES: { key: StageKey; label: string; color: string }[] = [
 
 export default function SubjectDetail() {
   const { id } = useParams<{ id: string }>();
+  const search  = useSearch();
   const subjectId = parseInt(id || '0', 10);
   const [, setLocation] = useLocation();
 
@@ -28,9 +29,16 @@ export default function SubjectDetail() {
   const systems = useSystemsBySubject(subjectId);
 
   const [showAddSystem, setShowAddSystem] = useState(false);
-  const [showEdit, setShowEdit] = useState(false);
-  const [editName, setEditName] = useState('');
-  const [activeFilter, setActiveFilter] = useState<StageKey | null>(null);
+  const [showEdit, setShowEdit]           = useState(false);
+  const [editName, setEditName]           = useState('');
+  const [activeFilter, setActiveFilter]   = useState<StageKey | null>(null);
+
+  // Read highlight param — passed from search results
+  const highlightId = (() => {
+    const params = new URLSearchParams(search);
+    const v = params.get('highlight');
+    return v ? parseInt(v, 10) : null;
+  })();
 
   if (!subject && id) {
     return <div className="p-8 text-center text-muted-foreground mt-20">Loading or subject not found.</div>;
@@ -190,7 +198,12 @@ export default function SubjectDetail() {
         ) : (
           <div className="grid gap-3">
             {visibleSystems.map(system => (
-              <SystemCard key={system.id} system={system} subjectName={subject.name} />
+              <SystemCard
+                key={system.id}
+                system={system}
+                subjectName={subject.name}
+                highlighted={system.id === highlightId}
+              />
             ))}
           </div>
         )}

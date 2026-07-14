@@ -7,37 +7,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { isRevisionDue, isRevisionOverdue } from '@/db/revisionEngine';
 import { format } from 'date-fns';
-
-// ── Keyword taxonomy ──────────────────────────────────────────────────────────
-type Keyword = 'strong' | 'average' | 'weak' | 'revision' | 'due' | 'overdue' | 'completed';
-
-const KEYWORDS: Keyword[] = ['strong', 'average', 'weak', 'revision', 'due', 'overdue', 'completed'];
-
-function extractKeywords(q: string): { keywords: Keyword[]; freeText: string } {
-  const words = q.toLowerCase().trim().split(/\s+/);
-  const keywords: Keyword[] = [];
-  const rest: string[] = [];
-  for (const w of words) {
-    if ((KEYWORDS as string[]).includes(w)) keywords.push(w as Keyword);
-    else rest.push(w);
-  }
-  return { keywords, freeText: rest.join(' ') };
-}
-
-function systemMatchesKeywords(sys: StudySystem, keywords: Keyword[]): boolean {
-  if (keywords.length === 0) return true;
-  return keywords.every(kw => {
-    switch (kw) {
-      case 'strong':    return sys.status === 'Strong';
-      case 'average':   return sys.status === 'Average';
-      case 'weak':      return sys.status === 'Weak';
-      case 'revision':  return Boolean(sys.completionDate);
-      case 'due':       return isRevisionDue(sys);
-      case 'overdue':   return isRevisionOverdue(sys);
-      case 'completed': return sys.contentCompleted && sys.qbankDone;
-    }
-  });
-}
+import { Keyword, KEYWORDS, runSearch } from '@/lib/searchUtils';
 
 // ── Status badge ──────────────────────────────────────────────────────────────
 function StatusBadge({ sys }: { sys: StudySystem }) {
@@ -83,7 +53,9 @@ function KeywordChip({ kw, active, onToggle }: { kw: Keyword; active: boolean; o
       onClick={() => onToggle(kw)}
       className={cn(
         'px-3 py-1.5 rounded-full text-xs font-semibold border transition-all capitalize',
-        active ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:bg-muted',
+        active
+          ? 'bg-primary text-primary-foreground border-primary'
+          : 'bg-card text-muted-foreground border-border hover:bg-muted',
       )}
     >
       {kw}
@@ -93,7 +65,7 @@ function KeywordChip({ kw, active, onToggle }: { kw: Keyword; active: boolean; o
 
 // ════════════════════════════════════════════════════════════════════════════
 export default function Search() {
-  const [query, setQuery]       = useState('');
+  const [query, setQuery]         = useState('');
   const [activeKws, setActiveKws] = useState<Set<Keyword>>(new Set());
   const subjects = useSubjects();
   const systems  = useAllSystems();
@@ -106,32 +78,18 @@ export default function Search() {
     });
   };
 
-  const results = useMemo(() => {
-    const { keywords: qKeywords, freeText } = extractKeywords(query);
-    const allKeywords = [...qKeywords, ...activeKws];
-    const ft = freeText.toLowerCase().trim();
-    const hasFilter = ft || allKeywords.length > 0;
-    if (!hasFilter) return { subjects: [], systems: [] };
+  // Merge chip keywords into the raw query for unified processing
+  const effectiveQuery = useMemo(() => {
+    const chips = [...activeKws].join(' ');
+    return [query, chips].filter(Boolean).join(' ');
+  }, [query, activeKws]);
 
-    const matchedSubjects = ft
-      ? subjects.filter(s => s.name.toLowerCase().includes(ft))
-      : [];
+  const results = useMemo(
+    () => runSearch(effectiveQuery, subjects, systems),
+    [effectiveQuery, subjects, systems],
+  );
 
-    const matchedSystems = systems
-      .filter(sys => {
-        const nameMatch = ft ? sys.name.toLowerCase().includes(ft) : true;
-        const kwMatch   = systemMatchesKeywords(sys, allKeywords);
-        return nameMatch && kwMatch;
-      })
-      .map(sys => {
-        const sub = subjects.find(s => s.id === sys.subjectId);
-        return { ...sys, subjectName: sub?.name ?? 'Unknown' };
-      });
-
-    return { subjects: matchedSubjects, systems: matchedSystems };
-  }, [query, activeKws, subjects, systems]);
-
-  const hasQuery = query.trim() || activeKws.size > 0;
+  const hasQuery = query.trim().length > 0 || activeKws.size > 0;
 
   return (
     <div className="min-h-[100dvh] bg-background px-4 pt-8 pb-24 max-w-3xl mx-auto flex flex-col">
@@ -165,7 +123,7 @@ export default function Search() {
           </div>
         ) : results.subjects.length === 0 && results.systems.length === 0 ? (
           <div className="text-center mt-20 text-muted-foreground">
-            <p>No results{query.trim() ? ` for "${query.trim()}"` : ''}</p>
+            <p className="font-medium">No matching results found.</p>
           </div>
         ) : (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -197,7 +155,7 @@ export default function Search() {
                 </h3>
                 <div className="bg-card rounded-2xl border shadow-sm overflow-hidden divide-y">
                   {results.systems.map(sys => (
-                    <Link key={sys.id} href={`/subjects/${sys.subjectId}`}>
+                    <Link key={sys.id} href={`/subjects/${sys.subjectId}?highlight=${sys.id}`}>
                       <div className="p-4 hover:bg-muted/50 transition-colors flex items-center gap-3 cursor-pointer group">
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-foreground mb-1 truncate">{sys.name}</div>
