@@ -2,5 +2,15 @@
   "buildCommand": "pnpm run build",
   "installCommand": "pnpm install",
   "nodeVersion": "20.x",
-  "outputDirectory": "artifacts/study-tracker/dist"
+  "outputDirectory": "artifacts/study-tracker/dist",
+  "routes": [
+    {
+      "src": "^/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "^(?!/api/).*",
+      "dest": "/index.html"
+    }
+  ]
 }
