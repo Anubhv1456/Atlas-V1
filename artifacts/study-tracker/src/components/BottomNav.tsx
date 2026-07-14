@@ -1,15 +1,15 @@
 import { Link, useLocation } from 'wouter';
-import { Home, CheckSquare, History, Settings } from 'lucide-react';
+import { Home, CheckSquare, CalendarDays, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function BottomNav() {
   const [location] = useLocation();
 
   const links = [
-    { href: '/', icon: Home, label: 'Home' },
-    { href: '/today', icon: CheckSquare, label: 'Today' },
-    { href: '/history', icon: History, label: 'History' },
-    { href: '/settings', icon: Settings, label: 'Settings' }
+    { href: '/',         icon: Home,          label: 'Home'     },
+    { href: '/today',    icon: CheckSquare,    label: 'Today'    },
+    { href: '/timeline', icon: CalendarDays,   label: 'Timeline' },
+    { href: '/settings', icon: Settings,       label: 'Settings' },
   ];
 
   return (
@@ -21,11 +21,11 @@ export function BottomNav() {
             <Link key={href} href={href} className="w-full">
               <div
                 className={cn(
-                  "flex flex-col items-center justify-center w-full h-full gap-1 text-muted-foreground transition-colors md:w-14 md:h-14 md:rounded-2xl hover:text-primary",
-                  isActive && "text-primary md:bg-primary/10"
+                  'flex flex-col items-center justify-center w-full h-full gap-1 text-muted-foreground transition-colors md:w-14 md:h-14 md:rounded-2xl hover:text-primary',
+                  isActive && 'text-primary md:bg-primary/10',
                 )}
               >
-                <Icon className={cn("w-6 h-6", isActive && "fill-primary/20 stroke-[2.5]")} />
+                <Icon className={cn('w-6 h-6', isActive && 'fill-primary/20 stroke-[2.5]')} />
                 <span className="text-[10px] font-medium md:hidden">{label}</span>
               </div>
             </Link>

@@ -8,7 +8,7 @@ import { BottomNav } from '@/components/BottomNav';
 import Home from '@/pages/Home';
 import SubjectDetail from '@/pages/SubjectDetail';
 import Today from '@/pages/Today';
-import History from '@/pages/History';
+import Timeline from '@/pages/Timeline';
 import Settings from '@/pages/Settings';
 
 const queryClient = new QueryClient();
@@ -35,7 +35,7 @@ function Router() {
           <Route path="/" component={Home} />
           <Route path="/subjects/:id" component={SubjectDetail} />
           <Route path="/today" component={Today} />
-          <Route path="/history" component={History} />
+          <Route path="/timeline" component={Timeline} />
           <Route path="/settings" component={Settings} />
           <Route component={NotFound} />
         </Switch>
