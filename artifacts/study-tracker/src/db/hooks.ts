@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, Subject, StudySystem, HistoryEntry } from './database';
+import { db, Subject, StudySystem, HistoryEntry, PYQYear } from './database';
 import { SystemStatus } from './database';
 import { scheduleFirstRevision, scheduleNextRevision, isRevisionDue, today } from './revisionEngine';
 
@@ -53,6 +53,19 @@ export function useRevisionsDue(): StudySystem[] {
   return systems.filter(s => isRevisionDue(s, now));
 }
 
+/** All PYQ years for a specific subject, ordered by year label. */
+export function usePYQsBySubject(subjectId: number): PYQYear[] {
+  return useLiveQuery(
+    () => db.pyqYears.where('subjectId').equals(subjectId).sortBy('year'),
+    [subjectId],
+  ) ?? [];
+}
+
+/** All PYQ years across all subjects. */
+export function useAllPYQs(): PYQYear[] {
+  return useLiveQuery(() => db.pyqYears.toArray()) ?? [];
+}
+
 // ── Actions ────────────────────────────────────────────────────────────────
 
 export async function addSubject(name: string) {
@@ -68,9 +81,10 @@ export async function updateSubject(id: number, name: string) {
 }
 
 export async function deleteSubject(id: number) {
-  await db.transaction('rw', db.subjects, db.systems, db.history, async () => {
+  await db.transaction('rw', db.subjects, db.systems, db.history, db.pyqYears, async () => {
     await db.history.where('subjectId').equals(id).delete();
     await db.systems.where('subjectId').equals(id).delete();
+    await db.pyqYears.where('subjectId').equals(id).delete();
     await db.subjects.delete(id);
   });
 }
@@ -109,6 +123,59 @@ export async function deleteSystem(id: number) {
 export async function logCompletion(entry: Omit<HistoryEntry, 'id'>) {
   return await db.history.add(entry);
 }
+
+// ── PYQ Year actions ───────────────────────────────────────────────────────
+
+/** Add a new year entry to a subject's PYQ section. */
+export async function addPYQYear(subjectId: number, year: string) {
+  return await db.pyqYears.add({
+    subjectId,
+    year: year.trim(),
+    completed: false,
+    completedAt: null,
+    createdAt: new Date(),
+  });
+}
+
+/** Rename a PYQ year entry. */
+export async function updatePYQYear(id: number, year: string) {
+  return await db.pyqYears.update(id, { year: year.trim() });
+}
+
+/** Remove a PYQ year entry and its associated history. */
+export async function deletePYQYear(id: number) {
+  return await db.pyqYears.delete(id);
+}
+
+/**
+ * Toggle a PYQ year's completion state.
+ * Logs a history entry when marking complete; silently undoes it when unchecking.
+ */
+export async function togglePYQYear(
+  id: number,
+  subjectId: number,
+  subjectName: string,
+  year: string,
+  currentlyCompleted: boolean,
+) {
+  const completed   = !currentlyCompleted;
+  const completedAt = completed ? new Date() : null;
+  await db.pyqYears.update(id, { completed, completedAt });
+  if (completed) {
+    await logCompletion({
+      subjectId,
+      subjectName,
+      systemId: 0,
+      systemName: '',
+      taskKey: 'pyqsDone',
+      // taskLabel becomes entityName in Timeline via historyToEvent
+      taskLabel: `${subjectName} PYQs ${year}`,
+      completedAt: new Date(),
+    });
+  }
+}
+
+// ── Revision actions ───────────────────────────────────────────────────────
 
 /**
  * Record the initial evaluation after a system is first fully completed.

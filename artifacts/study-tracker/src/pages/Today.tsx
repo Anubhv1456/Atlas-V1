@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { useSubjects, useAllSystems, updateSystem, logCompletion, completeRevision } from '@/db/hooks';
-import { Subject, StudySystem, SystemStatus } from '@/db/database';
+import {
+  useSubjects, useAllSystems, useAllPYQs,
+  updateSystem, logCompletion, completeRevision, togglePYQYear,
+} from '@/db/hooks';
+import { Subject, StudySystem, SystemStatus, PYQYear } from '@/db/database';
 import { ConfidenceDialog } from '@/components/ConfidenceDialog';
 import {
   Check, CheckCircle2, Trophy, ChevronDown, ChevronRight,
-  RotateCcw, AlertCircle,
+  RotateCcw, AlertCircle, BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link } from 'wouter';
@@ -15,19 +18,23 @@ import { isRevisionDue, isRevisionOverdue, daysOverdue } from '@/db/revisionEngi
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-type ActionKind = 'revision-overdue' | 'revision-due' | 'content' | 'qbank';
+type ActionKind = 'revision-overdue' | 'revision-due';
 
 interface ActionItem {
-  kind:       ActionKind;
-  system:     StudySystem;
-  subject:    Subject;
+  kind:        ActionKind;
+  system:      StudySystem;
+  subject:     Subject;
   overdueDays?: number;
 }
 
 interface SubjectRow {
   subject:      Subject;
   systems:      StudySystem[];
-  pendingCount: number; // systems with any actionable work
+  pyqYears:     PYQYear[];
+  /** Systems with any actionable work (study or revision). */
+  pendingSystemCount: number;
+  /** True when PYQs are unlocked (all systems done) but not all years complete. */
+  pyqsPending:  boolean;
   isComplete:   boolean;
 }
 
@@ -37,70 +44,40 @@ function systemHasAction(sys: StudySystem): boolean {
   return !sys.contentCompleted || !sys.qbankDone || isRevisionDue(sys);
 }
 
-function systemPendingStudy(sys: StudySystem): boolean {
-  return !sys.contentCompleted || !sys.qbankDone;
-}
-
-// ── Action Required item row ───────────────────────────────────────────────
+// ── Action Required row ────────────────────────────────────────────────────
 
 interface ActionRowProps {
-  item:            ActionItem;
-  onMarkStudy:     (item: ActionItem) => void;
-  onMarkRevision:  (item: ActionItem) => void;
+  item:           ActionItem;
+  onMarkRevision: (item: ActionItem) => void;
 }
 
-function ActionRow({ item, onMarkStudy, onMarkRevision }: ActionRowProps) {
-  const isRevision = item.kind === 'revision-overdue' || item.kind === 'revision-due';
-  const isOverdue  = item.kind === 'revision-overdue';
-
-  const label =
-    item.kind === 'revision-overdue' || item.kind === 'revision-due'
-      ? 'Revision'
-      : item.kind === 'content'
-        ? 'Content'
-        : 'QBank';
-
-  const badgeClass = {
-    'revision-overdue': 'bg-destructive/10 text-destructive',
-    'revision-due':     'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
-    'content':          'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-400',
-    'qbank':            'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400',
-  }[item.kind];
-
+function ActionRow({ item, onMarkRevision }: ActionRowProps) {
+  const isOverdue = item.kind === 'revision-overdue';
   return (
     <div className={cn(
       'bg-card rounded-2xl border shadow-sm p-3.5 flex items-center gap-3',
       isOverdue && 'border-destructive/30',
     )}>
-      {/* Action button */}
       <button
-        onClick={() => isRevision ? onMarkRevision(item) : onMarkStudy(item)}
+        onClick={() => onMarkRevision(item)}
         className={cn(
           'shrink-0 w-9 h-9 rounded-xl flex items-center justify-center border-2 transition-all duration-150 active:scale-90 group',
           isOverdue
             ? 'border-destructive/40 bg-destructive/5 hover:bg-destructive/15 hover:border-destructive'
-            : isRevision
-              ? 'border-amber-300/60 bg-amber-50/50 dark:bg-amber-900/10 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:border-amber-400'
-              : 'border-muted-foreground/25 bg-background hover:border-primary hover:bg-primary/10',
+            : 'border-amber-300/60 bg-amber-50/50 dark:bg-amber-900/10 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:border-amber-400',
         )}
       >
-        {isRevision
-          ? <RotateCcw className={cn('w-3.5 h-3.5 transition-colors', isOverdue ? 'text-destructive/60 group-hover:text-destructive' : 'text-amber-500/70 group-hover:text-amber-600')} />
-          : <Check className="w-4 h-4 text-muted-foreground/35 group-hover:text-primary transition-colors" />
-        }
+        <RotateCcw className={cn('w-3.5 h-3.5 transition-colors', isOverdue ? 'text-destructive/60 group-hover:text-destructive' : 'text-amber-500/70 group-hover:text-amber-600')} />
       </button>
-
-      {/* Label */}
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-foreground truncate">{item.system.name}</p>
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-          <span className={cn('text-[11px] px-1.5 py-0.5 rounded-full font-semibold', badgeClass)}>
-            {label}
+          <span className={cn('text-[11px] px-1.5 py-0.5 rounded-full font-semibold', isOverdue ? 'bg-destructive/10 text-destructive' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400')}>
+            Revision
           </span>
           {isOverdue && item.overdueDays !== undefined && (
             <span className="flex items-center gap-0.5 text-[10px] text-destructive">
-              <AlertCircle className="w-2.5 h-2.5" />
-              {item.overdueDays}d overdue
+              <AlertCircle className="w-2.5 h-2.5" />{item.overdueDays}d overdue
             </span>
           )}
           <span className="text-[10px] text-muted-foreground">{item.subject.name}</span>
@@ -110,27 +87,25 @@ function ActionRow({ item, onMarkStudy, onMarkRevision }: ActionRowProps) {
   );
 }
 
-// ── Expanded system task rows ────────────────────────────────────────────────
+// ── System task rows (inside expanded subject) ─────────────────────────────
 
 interface SystemTasksProps {
-  sys:             StudySystem;
-  subject:         Subject;
-  onMarkStudy:     (sys: StudySystem, taskKey: 'contentCompleted' | 'qbankDone') => void;
-  onMarkRevision:  (sys: StudySystem, subject: Subject) => void;
+  sys:            StudySystem;
+  subject:        Subject;
+  onMarkStudy:    (sys: StudySystem, taskKey: 'contentCompleted' | 'qbankDone') => void;
+  onMarkRevision: (sys: StudySystem, subject: Subject) => void;
 }
 
 function SystemTasks({ sys, subject, onMarkStudy, onMarkRevision }: SystemTasksProps) {
-  const tasks: { key: 'contentCompleted' | 'qbankDone'; label: string; done: boolean }[] = [
-    { key: 'contentCompleted', label: 'Content', done: sys.contentCompleted },
-    { key: 'qbankDone',        label: 'QBank',   done: sys.qbankDone },
+  const tasks = [
+    { key: 'contentCompleted' as const, label: 'Content', done: sys.contentCompleted },
+    { key: 'qbankDone'        as const, label: 'QBank',   done: sys.qbankDone },
   ];
-
   const pendingStudy = tasks.filter(t => !t.done);
   const revDue       = isRevisionDue(sys);
   const revOverdue   = isRevisionOverdue(sys);
   const overdueDays_ = daysOverdue(sys);
 
-  // Only render if there's something to do
   if (pendingStudy.length === 0 && !revDue) return null;
 
   const stepColors: Record<string, string> = {
@@ -141,8 +116,6 @@ function SystemTasks({ sys, subject, onMarkStudy, onMarkRevision }: SystemTasksP
   return (
     <div className="space-y-2">
       <p className="text-xs font-semibold text-foreground/70 px-1 pt-0.5">{sys.name}</p>
-
-      {/* Study tasks */}
       {pendingStudy.map(task => (
         <div key={task.key} className="bg-card rounded-xl border shadow-sm p-3 flex items-center gap-3">
           <button
@@ -152,19 +125,13 @@ function SystemTasks({ sys, subject, onMarkStudy, onMarkRevision }: SystemTasksP
             <Check className="w-4 h-4 text-muted-foreground/30 group-hover:text-primary transition-colors" />
           </button>
           <div className="flex-1 min-w-0 flex items-center gap-2">
-            <span className={cn('text-[11px] px-1.5 py-0.5 rounded-full font-semibold', stepColors[task.key])}>
-              {task.label}
-            </span>
+            <span className={cn('text-[11px] px-1.5 py-0.5 rounded-full font-semibold', stepColors[task.key])}>{task.label}</span>
             {task.key === 'contentCompleted' && sys.contentInitialized && !sys.contentCompleted && (
-              <span className="text-[11px] text-muted-foreground tabular-nums">
-                {sys.contentUnitsCompleted}/{sys.contentUnitsTotal}
-              </span>
+              <span className="text-[11px] text-muted-foreground tabular-nums">{sys.contentUnitsCompleted}/{sys.contentUnitsTotal}</span>
             )}
           </div>
         </div>
       ))}
-
-      {/* Revision task */}
       {revDue && (
         <div className={cn('bg-card rounded-xl border shadow-sm p-3 flex items-center gap-3', revOverdue && 'border-destructive/30')}>
           <button
@@ -183,13 +150,75 @@ function SystemTasks({ sys, subject, onMarkStudy, onMarkRevision }: SystemTasksP
               Revision
             </span>
             {revOverdue && overdueDays_ > 0 && (
-              <span className="flex items-center gap-0.5 text-[10px] text-destructive">
-                <AlertCircle className="w-2.5 h-2.5" />{overdueDays_}d overdue
-              </span>
+              <span className="flex items-center gap-0.5 text-[10px] text-destructive"><AlertCircle className="w-2.5 h-2.5" />{overdueDays_}d overdue</span>
             )}
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── PYQ card (inside expanded subject) ────────────────────────────────────
+
+interface PYQCardProps {
+  subject:  Subject;
+  years:    PYQYear[];
+}
+
+function PYQCard({ subject, years }: PYQCardProps) {
+  const [expanded, setExpanded] = useState(false);
+  const completed = years.filter(y => y.completed).length;
+  const total     = years.length;
+
+  const handleToggle = (year: PYQYear) => {
+    togglePYQYear(year.id!, subject.id!, subject.name, year.year, year.completed);
+  };
+
+  return (
+    <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+      {/* Header — tap to expand */}
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="w-full flex items-center gap-3 px-3 py-3 text-left hover:bg-muted/30 transition-colors focus:outline-none"
+      >
+        {expanded
+          ? <ChevronDown  className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
+          : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />}
+        <BookOpen className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <span className="text-xs font-semibold text-foreground">PYQs</span>
+          <span className="text-[11px] text-muted-foreground ml-2">{completed} / {total} Years Completed</span>
+        </div>
+      </button>
+
+      {/* Expanded year list */}
+      <div className={cn(
+        'grid transition-all duration-200 ease-in-out',
+        expanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
+      )}>
+        <div className="overflow-hidden">
+          <div className="px-3 pb-3 pt-1 border-t border-border/30 space-y-1.5">
+            {years.map(year => (
+              <button
+                key={year.id}
+                onClick={() => handleToggle(year)}
+                className="w-full flex items-center gap-3 py-1.5 rounded-lg hover:bg-muted/40 transition-colors px-1 text-left"
+              >
+                <div className={cn(
+                  'shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all',
+                  year.completed ? 'bg-green-500 border-green-500 text-white' : 'border-muted-foreground/30',
+                )}>
+                  {year.completed && <Check className="w-3 h-3" />}
+                </div>
+                <span className={cn('text-xs font-medium', year.completed ? 'line-through text-muted-foreground' : 'text-foreground')}>
+                  {year.year}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -207,9 +236,18 @@ interface SubjectSectionProps {
 function SubjectSection({ row, expanded, onToggle, onMarkStudy, onMarkRevision }: SubjectSectionProps) {
   const Chevron = expanded ? ChevronDown : ChevronRight;
 
+  // Collapsed summary text
+  const summaryText = (() => {
+    if (row.isComplete) return 'Completed';
+    if (row.pendingSystemCount === 0 && row.pyqsPending) return 'PYQs Pending';
+    if (row.pendingSystemCount > 0 && row.pyqsPending) return `${row.pendingSystemCount} System${row.pendingSystemCount !== 1 ? 's' : ''} + PYQs Pending`;
+    return `${row.pendingSystemCount} System${row.pendingSystemCount !== 1 ? 's' : ''} Pending`;
+  })();
+
+  const actionableSystems = row.systems.filter(systemHasAction);
+
   return (
     <div className="bg-card rounded-2xl border shadow-sm overflow-hidden">
-      {/* Header — always visible */}
       <button
         onClick={onToggle}
         className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-muted/30 transition-colors focus:outline-none"
@@ -218,7 +256,7 @@ function SubjectSection({ row, expanded, onToggle, onMarkStudy, onMarkRevision }
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-foreground text-sm">{row.subject.name}</p>
           <p className={cn('text-xs mt-0.5', row.isComplete ? 'text-green-600 dark:text-green-400 font-medium' : 'text-muted-foreground')}>
-            {row.isComplete ? 'Completed' : `${row.pendingCount} System${row.pendingCount !== 1 ? 's' : ''} Pending`}
+            {summaryText}
           </p>
         </div>
         <Link href={`/subjects/${row.subject.id}`} onClick={e => e.stopPropagation()}>
@@ -226,28 +264,30 @@ function SubjectSection({ row, expanded, onToggle, onMarkStudy, onMarkRevision }
         </Link>
       </button>
 
-      {/* Expanded body */}
       <div className={cn(
         'grid transition-all duration-300 ease-in-out',
         expanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
       )}>
         <div className="overflow-hidden">
           <div className="px-4 pb-4 pt-1 border-t border-border/40 space-y-4">
-            {row.systems
-              .filter(sys => systemHasAction(sys))
-              .map(sys => (
-                <SystemTasks
-                  key={sys.id}
-                  sys={sys}
-                  subject={row.subject}
-                  onMarkStudy={onMarkStudy}
-                  onMarkRevision={onMarkRevision}
-                />
-              ))}
+            {/* System tasks */}
+            {actionableSystems.map(sys => (
+              <SystemTasks
+                key={sys.id}
+                sys={sys}
+                subject={row.subject}
+                onMarkStudy={onMarkStudy}
+                onMarkRevision={onMarkRevision}
+              />
+            ))}
+
+            {/* PYQ card — shown when unlocked + has years + not all done */}
+            {row.pyqsPending && row.pyqYears.length > 0 && (
+              <PYQCard subject={row.subject} years={row.pyqYears} />
+            )}
+
             {row.isComplete && (
-              <p className="text-sm text-muted-foreground text-center py-2">
-                All systems complete — great work!
-              </p>
+              <p className="text-sm text-muted-foreground text-center py-2">All done — great work!</p>
             )}
           </div>
         </div>
@@ -260,48 +300,65 @@ function SubjectSection({ row, expanded, onToggle, onMarkStudy, onMarkRevision }
 export default function Today() {
   const subjects = useSubjects();
   const systems  = useAllSystems();
+  const allPyqs  = useAllPYQs();
 
-  // Collapsed state — all subjects start collapsed
-  const [expanded, setExpanded] = useState<Record<number, boolean>>({});
-
-  // Content init dialog
-  const [initSys,    setInitSys]    = useState<{ sys: StudySystem; subject: Subject; taskKey: 'contentCompleted' | 'qbankDone' } | null>(null);
-  const [initValue,  setInitValue]  = useState('');
-
-  // Revision confidence dialog
+  const [expanded,       setExpanded]       = useState<Record<number, boolean>>({});
+  const [initSys,        setInitSys]        = useState<{ sys: StudySystem; subject: Subject; taskKey: 'contentCompleted' | 'qbankDone' } | null>(null);
+  const [initValue,      setInitValue]      = useState('');
   const [revTarget,      setRevTarget]      = useState<{ sys: StudySystem; subject: Subject } | null>(null);
   const [showRevDialog,  setShowRevDialog]  = useState(false);
 
   const toggleSubject = (id: number) =>
     setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
 
-  // ── Build Action Required list ─────────────────────────────────────────────
-  const actionItems: ActionItem[] = [];
-
-  systems.forEach(sys => {
-    const subject = subjects.find(s => s.id === sys.subjectId);
-    if (!subject) return;
-
-    if (isRevisionOverdue(sys)) {
-      actionItems.push({ kind: 'revision-overdue', system: sys, subject, overdueDays: daysOverdue(sys) });
-    } else if (isRevisionDue(sys)) {
-      actionItems.push({ kind: 'revision-due', system: sys, subject });
-    }
-  });
-
-  // Priority order: overdue revisions first (most-days-first), then due-today
-  const sortedActions = [
-    ...actionItems.filter(i => i.kind === 'revision-overdue').sort((a, b) => (b.overdueDays ?? 0) - (a.overdueDays ?? 0)),
-    ...actionItems.filter(i => i.kind === 'revision-due').sort((a, b) => a.system.name.localeCompare(b.system.name)),
+  // ── Build Action Required list (revisions only) ────────────────────────────
+  const sortedActions: ActionItem[] = [
+    ...systems
+      .filter(sys => isRevisionOverdue(sys))
+      .map(sys => {
+        const subject = subjects.find(s => s.id === sys.subjectId);
+        if (!subject) return null;
+        return { kind: 'revision-overdue' as const, system: sys, subject, overdueDays: daysOverdue(sys) };
+      })
+      .filter(Boolean)
+      .sort((a, b) => (b!.overdueDays ?? 0) - (a!.overdueDays ?? 0)) as ActionItem[],
+    ...systems
+      .filter(sys => isRevisionDue(sys) && !isRevisionOverdue(sys))
+      .map(sys => {
+        const subject = subjects.find(s => s.id === sys.subjectId);
+        if (!subject) return null;
+        return { kind: 'revision-due' as const, system: sys, subject };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a!.system.name.localeCompare(b!.system.name)) as ActionItem[],
   ];
 
   // ── Build subject rows ─────────────────────────────────────────────────────
   const subjectRows: SubjectRow[] = subjects
     .map(subject => {
-      const subSystems = systems.filter(s => s.subjectId === subject.id);
-      const pendingCount = subSystems.filter(systemHasAction).length;
-      const isComplete   = subSystems.length > 0 && pendingCount === 0;
-      return { subject, systems: subSystems, pendingCount, isComplete };
+      const subSystems  = systems.filter(s => s.subjectId === subject.id);
+      const subPyqs     = allPyqs.filter(p => p.subjectId === subject.id);
+
+      const allSystemsDone    = subSystems.length > 0 && subSystems.every(s => s.contentCompleted && s.qbankDone);
+      const pendingSystemCount = subSystems.filter(systemHasAction).length;
+      const pyqsUnlocked      = allSystemsDone;
+      const allPyqsDone       = subPyqs.length > 0 && subPyqs.every(p => p.completed);
+      const pyqsPending       = pyqsUnlocked && subPyqs.length > 0 && !allPyqsDone;
+
+      // Subject is complete only when systems + PYQs are all done
+      const isComplete =
+        subSystems.length > 0 &&
+        pendingSystemCount === 0 &&
+        (subPyqs.length === 0 || allPyqsDone);
+
+      return {
+        subject,
+        systems: subSystems,
+        pyqYears: subPyqs,
+        pendingSystemCount,
+        pyqsPending,
+        isComplete,
+      };
     })
     .sort((a, b) => a.subject.name.localeCompare(b.subject.name));
 
@@ -310,13 +367,8 @@ export default function Today() {
   // ── Mark study step done ───────────────────────────────────────────────────
   const markStudyDone = (sys: StudySystem, taskKey: 'contentCompleted' | 'qbankDone') => {
     const subject = subjects.find(s => s.id === sys.subjectId)!;
-
     if (taskKey === 'contentCompleted') {
-      if (!sys.contentInitialized) {
-        setInitValue('');
-        setInitSys({ sys, subject, taskKey });
-        return;
-      }
+      if (!sys.contentInitialized) { setInitValue(''); setInitSys({ sys, subject, taskKey }); return; }
       const newCompleted = sys.contentUnitsCompleted + 1;
       const isNowDone    = newCompleted >= sys.contentUnitsTotal;
       updateSystem(sys.id!, { contentUnitsCompleted: newCompleted, contentCompleted: isNowDone });
@@ -330,11 +382,6 @@ export default function Today() {
     }
   };
 
-  // Action row version (same logic, via ActionItem)
-  const markActionStudy = (item: ActionItem) => {
-    markStudyDone(item.system, item.kind === 'content' ? 'contentCompleted' : 'qbankDone');
-  };
-
   const handleInitSave = () => {
     if (!initSys) return;
     const total = parseInt(initValue, 10);
@@ -343,20 +390,13 @@ export default function Today() {
     setInitSys(null); setInitValue('');
   };
 
-  // ── Revision ───────────────────────────────────────────────────────────────
-  const openRevDialog = (sys: StudySystem, subject: Subject) => {
-    setRevTarget({ sys, subject });
-    setShowRevDialog(true);
-  };
-  const markActionRevision = (item: ActionItem) => openRevDialog(item.system, item.subject);
+  const openRevDialog    = (sys: StudySystem, subject: Subject) => { setRevTarget({ sys, subject }); setShowRevDialog(true); };
+  const markActionRev    = (item: ActionItem)                   => openRevDialog(item.system, item.subject);
 
   const handleRevisionConfidence = async (confidence: SystemStatus) => {
     setShowRevDialog(false);
     if (!revTarget) return;
-    await completeRevision(
-      revTarget.sys.id!, confidence,
-      revTarget.subject.id!, revTarget.subject.name, revTarget.sys.name,
-    );
+    await completeRevision(revTarget.sys.id!, confidence, revTarget.subject.id!, revTarget.subject.name, revTarget.sys.name);
     setRevTarget(null);
   };
 
@@ -364,14 +404,11 @@ export default function Today() {
   return (
     <div className="min-h-[100dvh] bg-background px-4 pt-8 pb-24 max-w-3xl mx-auto">
       <header className="mb-8">
-        <h1 className="text-[35px] leading-tight font-bold text-foreground tracking-tight mb-2">
-          Today's Focus
-        </h1>
+        <h1 className="text-[35px] leading-tight font-bold text-foreground tracking-tight mb-2">Today's Focus</h1>
         <p className="text-sm text-muted-foreground">What should you work on right now?</p>
       </header>
 
       {nothingAtAll ? (
-        /* ── All done ───────────────────────────────────────────────────── */
         <div className="text-center py-20 px-4 bg-muted/20 rounded-3xl border border-dashed mt-4 flex flex-col items-center">
           <div className="relative w-24 h-24 mb-6 flex items-center justify-center">
             <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping opacity-75" />
@@ -380,9 +417,7 @@ export default function Today() {
             </div>
           </div>
           <h2 className="text-2xl font-bold text-foreground mb-3">All caught up!</h2>
-          <p className="text-muted-foreground mb-8 max-w-[280px]">
-            No pending study steps and no revisions due. Take a well-deserved break.
-          </p>
+          <p className="text-muted-foreground mb-8 max-w-[280px]">No pending study steps and no revisions due. Take a well-deserved break.</p>
           <Link href="/">
             <button className="bg-card border shadow-sm px-6 py-3 rounded-xl font-medium text-foreground hover:bg-muted transition-colors flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5 text-primary" />View Dashboard
@@ -391,31 +426,22 @@ export default function Today() {
         </div>
       ) : (
         <div className="space-y-8">
-          {/* ── Action Required ──────────────────────────────────────────── */}
+          {/* ── Action Required (revisions only) ──────────────────────────── */}
           {sortedActions.length > 0 && (
             <section>
-              <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3 pl-1">
-                Action Required
-              </h2>
+              <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3 pl-1">Action Required</h2>
               <div className="space-y-2">
                 {sortedActions.map((item, idx) => (
-                  <ActionRow
-                    key={`${item.kind}-${item.system.id}-${idx}`}
-                    item={item}
-                    onMarkStudy={markActionStudy}
-                    onMarkRevision={markActionRevision}
-                  />
+                  <ActionRow key={`${item.kind}-${item.system.id}-${idx}`} item={item} onMarkRevision={markActionRev} />
                 ))}
               </div>
             </section>
           )}
 
-          {/* ── Subjects ─────────────────────────────────────────────────── */}
+          {/* ── Subjects ──────────────────────────────────────────────────── */}
           {subjectRows.length > 0 && (
             <section>
-              <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3 pl-1">
-                Subjects
-              </h2>
+              <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3 pl-1">Subjects</h2>
               <div className="space-y-2">
                 {subjectRows.map(row => (
                   <SubjectSection
@@ -433,17 +459,12 @@ export default function Today() {
         </div>
       )}
 
-      {/* ── Content init dialog ────────────────────────────────────────────── */}
+      {/* Content init dialog */}
       <Dialog open={!!initSys} onOpenChange={open => { if (!open) setInitSys(null); }}>
         <DialogContent className="sm:max-w-[360px] rounded-2xl mx-4 w-[calc(100%-2rem)]">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-semibold">
-              How many content units does this system have?
-            </DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle className="text-xl font-semibold">How many content units does this system have?</DialogTitle></DialogHeader>
           <div className="py-4">
-            <Input
-              autoFocus type="number" min="1" placeholder="e.g. 15"
+            <Input autoFocus type="number" min="1" placeholder="e.g. 15"
               value={initValue} onChange={e => setInitValue(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleInitSave(); } }}
               className="text-lg py-6 px-4 bg-muted/50 border-transparent focus-visible:ring-primary focus-visible:bg-background"
@@ -456,7 +477,7 @@ export default function Today() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Revision confidence dialog ─────────────────────────────────────── */}
+      {/* Revision confidence dialog */}
       <ConfidenceDialog
         open={showRevDialog}
         title="How well do you know this system?"

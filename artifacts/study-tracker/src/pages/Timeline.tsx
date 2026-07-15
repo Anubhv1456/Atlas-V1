@@ -28,10 +28,15 @@ function historyToEvent(h: HistoryEntry): TimelineEvent {
     pyqsDone:    'pyqsDone',
     revision:    'revisionSystem',
   };
+  // PYQ entries store the full label as taskLabel (e.g. "Medicine PYQs 2022")
+  // and have no systemName, so use taskLabel directly as entityName.
+  const entityName = h.taskKey === 'pyqsDone'
+    ? h.taskLabel
+    : `${h.systemName} ${h.taskLabel}`;
   return {
     id:          String(h.id ?? `${h.systemId}-${h.taskKey}-${h.completedAt}`),
     eventType:   typeMap[h.taskKey] ?? 'contentCompleted',
-    entityName:  `${h.systemName} ${h.taskLabel}`,
+    entityName,
     subjectName: h.subjectName,
     date:        new Date(h.completedAt),
     status:      'completed',

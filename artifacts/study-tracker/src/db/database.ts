@@ -39,10 +39,22 @@ export interface StudySystem {
   nextRevisionDate: Date | null;
 }
 
+/** One year entry under a subject's PYQ section. */
+export interface PYQYear {
+  id?: number;
+  subjectId: number;
+  /** User-defined year label, e.g. "2024". */
+  year: string;
+  completed: boolean;
+  completedAt: Date | null;
+  createdAt: Date;
+}
+
 export interface HistoryEntry {
   id?: number;
   subjectId: number;
   subjectName: string;
+  /** 0 for subject-level entries (PYQs). */
   systemId: number;
   systemName: string;
   taskKey: string;
@@ -54,6 +66,7 @@ export class AtlasDB extends Dexie {
   subjects!: Table<Subject, number>;
   systems!: Table<StudySystem, number>;
   history!: Table<HistoryEntry, number>;
+  pyqYears!: Table<PYQYear, number>;
 
   constructor() {
     super('AtlasDB');
@@ -97,13 +110,20 @@ export class AtlasDB extends Dexie {
           .table('systems')
           .toCollection()
           .modify((sys: Record<string, unknown>) => {
-            if (!('completionDate' in sys))         sys['completionDate'] = null;
-            if (!('revisionCount' in sys))          sys['revisionCount'] = 0;
-            if (!('lastRevisionDate' in sys))       sys['lastRevisionDate'] = null;
+            if (!('completionDate' in sys))          sys['completionDate'] = null;
+            if (!('revisionCount' in sys))           sys['revisionCount'] = 0;
+            if (!('lastRevisionDate' in sys))        sys['lastRevisionDate'] = null;
             if (!('currentRevisionInterval' in sys)) sys['currentRevisionInterval'] = null;
-            if (!('nextRevisionDate' in sys))       sys['nextRevisionDate'] = null;
+            if (!('nextRevisionDate' in sys))        sys['nextRevisionDate'] = null;
           });
       });
+    // v5: add subject-level PYQ years table
+    this.version(5).stores({
+      subjects: '++id, name',
+      systems: '++id, subjectId, name, updatedAt, nextRevisionDate',
+      history: '++id, subjectId, systemId, completedAt',
+      pyqYears: '++id, subjectId',
+    });
   }
 }
 
@@ -113,20 +133,23 @@ export const db = new AtlasDB();
 
 export async function exportData() {
   const subjects = await db.subjects.toArray();
-  const systems = await db.systems.toArray();
-  const history = await db.history.toArray();
-  return { subjects, systems, history };
+  const systems  = await db.systems.toArray();
+  const history  = await db.history.toArray();
+  const pyqYears = await db.pyqYears.toArray();
+  return { subjects, systems, history, pyqYears };
 }
 
 export async function importData(data: {
   subjects: Subject[];
   systems: StudySystem[];
   history?: HistoryEntry[];
+  pyqYears?: PYQYear[];
 }) {
-  await db.transaction('rw', db.subjects, db.systems, db.history, async () => {
+  await db.transaction('rw', db.subjects, db.systems, db.history, db.pyqYears, async () => {
     await db.subjects.clear();
     await db.systems.clear();
     await db.history.clear();
+    await db.pyqYears.clear();
 
     if (data.subjects?.length) {
       await db.subjects.bulkAdd(
@@ -142,25 +165,22 @@ export async function importData(data: {
       await db.systems.bulkAdd(
         data.systems.map(s => {
           const base = { ...s, updatedAt: new Date(s.updatedAt) };
-          // Migrate old-format backups (contentDone boolean → incremental fields)
-          const old = s as Record<string, unknown>;
+          const old  = s as Record<string, unknown>;
           if (typeof old['contentDone'] === 'boolean' && !('contentInitialized' in s)) {
             const wasDone = Boolean(old['contentDone']);
-            base.contentInitialized = wasDone;
-            base.contentUnitsTotal = wasDone ? 1 : 0;
+            base.contentInitialized    = wasDone;
+            base.contentUnitsTotal     = wasDone ? 1 : 0;
             base.contentUnitsCompleted = wasDone ? 1 : 0;
-            base.contentCompleted = wasDone;
+            base.contentCompleted      = wasDone;
           }
-          // Default revision fields
-          if (!('completionDate' in s)) base.completionDate = null;
-          if (!('revisionCount' in s)) base.revisionCount = 0;
-          if (!('lastRevisionDate' in s)) base.lastRevisionDate = null;
+          if (!('completionDate' in s))          base.completionDate = null;
+          if (!('revisionCount' in s))           base.revisionCount = 0;
+          if (!('lastRevisionDate' in s))        base.lastRevisionDate = null;
           if (!('currentRevisionInterval' in s)) base.currentRevisionInterval = null;
-          if (!('nextRevisionDate' in s)) base.nextRevisionDate = null;
-          // Coerce dates
-          if (base.completionDate) base.completionDate = new Date(base.completionDate as unknown as string);
-          if (base.lastRevisionDate) base.lastRevisionDate = new Date(base.lastRevisionDate as unknown as string);
-          if (base.nextRevisionDate) base.nextRevisionDate = new Date(base.nextRevisionDate as unknown as string);
+          if (!('nextRevisionDate' in s))        base.nextRevisionDate = null;
+          if (base.completionDate)    base.completionDate    = new Date(base.completionDate as unknown as string);
+          if (base.lastRevisionDate)  base.lastRevisionDate  = new Date(base.lastRevisionDate as unknown as string);
+          if (base.nextRevisionDate)  base.nextRevisionDate  = new Date(base.nextRevisionDate as unknown as string);
           return base;
         }),
       );
@@ -169,6 +189,16 @@ export async function importData(data: {
     if (data.history?.length) {
       await db.history.bulkAdd(
         data.history.map(h => ({ ...h, completedAt: new Date(h.completedAt) })),
+      );
+    }
+
+    if (data.pyqYears?.length) {
+      await db.pyqYears.bulkAdd(
+        data.pyqYears.map(p => ({
+          ...p,
+          createdAt:   new Date(p.createdAt),
+          completedAt: p.completedAt ? new Date(p.completedAt) : null,
+        })),
       );
     }
   });
