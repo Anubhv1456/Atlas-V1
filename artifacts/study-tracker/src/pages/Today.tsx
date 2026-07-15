@@ -64,15 +64,15 @@ function ActionRow({ item, onMarkRevision }: ActionRowProps) {
           'shrink-0 w-9 h-9 rounded-xl flex items-center justify-center border-2 transition-all duration-150 active:scale-90 group',
           isOverdue
             ? 'border-destructive/40 bg-destructive/5 hover:bg-destructive/15 hover:border-destructive'
-            : 'border-amber-300/60 bg-amber-50/50 dark:bg-amber-900/10 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:border-amber-400',
+            : 'border-amber-400/40 bg-amber-950/5 dark:bg-amber-950/15 hover:bg-amber-950/10 dark:hover:bg-amber-950/25 hover:border-amber-500/50',
         )}
       >
-        <RotateCcw className={cn('w-3.5 h-3.5 transition-colors', isOverdue ? 'text-destructive/60 group-hover:text-destructive' : 'text-amber-500/70 group-hover:text-amber-600')} />
+        <RotateCcw className={cn('w-3.5 h-3.5 transition-colors', isOverdue ? 'text-destructive/60 group-hover:text-destructive' : 'text-amber-500/60 group-hover:text-amber-500')} />
       </button>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-foreground truncate">{item.system.name}</p>
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-          <span className={cn('text-[11px] px-1.5 py-0.5 rounded-full font-semibold', isOverdue ? 'bg-destructive/10 text-destructive' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400')}>
+          <span className={cn('text-[11px] px-1.5 py-0.5 rounded-full font-semibold', isOverdue ? 'bg-destructive/10 text-destructive' : 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400')}>
             Revision
           </span>
           {isOverdue && item.overdueDays !== undefined && (
@@ -140,13 +140,13 @@ function SystemTasks({ sys, subject, onMarkStudy, onMarkRevision }: SystemTasksP
               'shrink-0 w-8 h-8 rounded-lg flex items-center justify-center border-2 transition-all duration-150 active:scale-90 group',
               revOverdue
                 ? 'border-destructive/40 bg-destructive/5 hover:bg-destructive/15 hover:border-destructive'
-                : 'border-amber-300/60 bg-amber-50/50 dark:bg-amber-900/10 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:border-amber-400',
+                : 'border-amber-400/40 bg-amber-950/5 dark:bg-amber-950/15 hover:bg-amber-950/10 dark:hover:bg-amber-950/25 hover:border-amber-500/50',
             )}
           >
-            <RotateCcw className={cn('w-3.5 h-3.5 transition-colors', revOverdue ? 'text-destructive/60 group-hover:text-destructive' : 'text-amber-500/70 group-hover:text-amber-600')} />
+            <RotateCcw className={cn('w-3.5 h-3.5 transition-colors', revOverdue ? 'text-destructive/60 group-hover:text-destructive' : 'text-amber-500/60 group-hover:text-amber-500')} />
           </button>
           <div className="flex-1 min-w-0 flex items-center gap-2">
-            <span className={cn('text-[11px] px-1.5 py-0.5 rounded-full font-semibold', revOverdue ? 'bg-destructive/10 text-destructive' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400')}>
+            <span className={cn('text-[11px] px-1.5 py-0.5 rounded-full font-semibold', revOverdue ? 'bg-destructive/10 text-destructive' : 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400')}>
               Revision
             </span>
             {revOverdue && overdueDays_ > 0 && (
@@ -185,7 +185,7 @@ function PYQCard({ subject, years }: PYQCardProps) {
         {expanded
           ? <ChevronDown  className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
           : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />}
-        <BookOpen className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+        <BookOpen className="w-3.5 h-3.5 text-gold shrink-0" />
         <div className="flex-1 min-w-0">
           <span className="text-xs font-semibold text-foreground">PYQs</span>
           <span className="text-[11px] text-muted-foreground ml-2">{completed} / {total} Years Completed</span>
@@ -255,7 +255,7 @@ function SubjectSection({ row, expanded, onToggle, onMarkStudy, onMarkRevision }
         <Chevron className="w-4 h-4 text-muted-foreground/60 shrink-0 transition-transform duration-200" />
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-foreground text-sm">{row.subject.name}</p>
-          <p className={cn('text-xs mt-0.5', row.isComplete ? 'text-green-600 dark:text-green-400 font-medium' : 'text-muted-foreground')}>
+          <p className={cn('text-xs mt-0.5', row.isComplete ? 'text-primary dark:text-gold font-medium' : 'text-muted-foreground')}>
             {summaryText}
           </p>
         </div>

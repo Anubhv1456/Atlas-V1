@@ -80,7 +80,7 @@ function PYQSection({ subjectId, subjectName, years }: PYQSectionProps) {
                   : <ChevronRight className="w-4 h-4 text-muted-foreground/60 shrink-0" />}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+            <BookOpen className="w-4 h-4 text-gold shrink-0" />
             <p className="font-semibold text-foreground text-sm">PYQs</p>
           </div>
           <p className={cn(
@@ -88,7 +88,7 @@ function PYQSection({ subjectId, subjectName, years }: PYQSectionProps) {
             total === 0
               ? 'text-muted-foreground'
               : completed === total
-                ? 'text-green-600 dark:text-green-400 font-medium'
+                ? 'text-primary dark:text-gold font-medium'
                 : 'text-muted-foreground',
           )}>
             {total === 0

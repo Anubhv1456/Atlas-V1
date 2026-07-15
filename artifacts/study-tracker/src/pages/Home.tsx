@@ -15,9 +15,9 @@ import { StudySystem } from '@/db/database';
 
 function StatusBadge({ sys }: { sys: StudySystem }) {
   const colors = {
-    Strong:  'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-    Average: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
-    Weak:    'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+    Strong:  'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400',
+    Average: 'bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400',
+    Weak:    'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-400',
   };
   return (
     <span className={cn('text-[10px] px-2 py-0.5 rounded-full font-semibold shrink-0', colors[sys.status])}>
@@ -34,7 +34,7 @@ function RevisionPill({ sys }: { sys: StudySystem }) {
     </span>
   );
   if (isRevisionDue(sys)) return (
-    <span className="flex items-center gap-0.5 text-[10px] text-amber-600 dark:text-amber-400 font-semibold shrink-0">
+    <span className="flex items-center gap-0.5 text-[10px] text-amber-600 dark:text-amber-500 font-semibold shrink-0">
       <Clock className="w-2.5 h-2.5" />Due today
     </span>
   );
@@ -144,7 +144,7 @@ export default function Home() {
           >
             {searchOpen
               ? <X className="w-5 h-5" />
-              : <SearchIcon className="w-5 h-5" />
+              : <SearchIcon className="w-5 h-5 text-gold" />
             }
           </button>
         </div>
@@ -247,11 +247,11 @@ export default function Home() {
             </div>
 
             <div className="bg-card rounded-2xl p-4 border shadow-sm flex flex-col justify-between">
-              <div className="flex items-center gap-2 mb-2 text-amber-600/80">
+              <div className="flex items-center gap-2 mb-2 text-muted-foreground">
                 <Layers className="w-4 h-4" />
                 <span className="text-xs font-semibold uppercase tracking-wider">Pending</span>
               </div>
-              <span className="text-3xl font-bold text-amber-700 dark:text-amber-500">{pendingTasks}</span>
+              <span className="text-3xl font-bold text-foreground">{pendingTasks}</span>
             </div>
           </section>
 

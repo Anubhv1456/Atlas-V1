@@ -160,9 +160,9 @@ export function SystemCard({ system, subjectName, highlighted }: SystemCardProps
   const handleDelete       = () => { if (confirm('Are you sure you want to delete this system?')) deleteSystem(system.id!); };
 
   const statusColors: Record<SystemStatus, string> = {
-    Strong:  'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800/50',
-    Average: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800/50',
-    Weak:    'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800/50',
+    Strong:  'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/80',
+    Average: 'bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400 border-amber-200 dark:border-amber-900/80',
+    Weak:    'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-400 border-red-200 dark:border-red-900/80',
   };
 
   return (
@@ -170,7 +170,7 @@ export function SystemCard({ system, subjectName, highlighted }: SystemCardProps
       <div ref={cardRef} className={cn(
         'bg-card rounded-2xl border border-card-border shadow-sm overflow-hidden transition-all duration-300',
         revisionOverdue && 'border-destructive/50',
-        revisionDue && !revisionOverdue && 'border-amber-400/50',
+        revisionDue && !revisionOverdue && 'border-amber-500/25',
         highlighted && 'ring-2 ring-primary ring-offset-2',
       )}>
         {/* Revision due banner */}
@@ -179,7 +179,7 @@ export function SystemCard({ system, subjectName, highlighted }: SystemCardProps
             'flex items-center gap-2 px-4 py-2 text-xs font-semibold',
             revisionOverdue
               ? 'bg-destructive/10 text-destructive'
-              : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
+              : 'bg-amber-50/60 dark:bg-amber-950/30 text-amber-700/90 dark:text-amber-500',
           )}>
             <Clock className="w-3.5 h-3.5 shrink-0" />
             {revisionOverdue
@@ -271,7 +271,7 @@ export function SystemCard({ system, subjectName, highlighted }: SystemCardProps
                         ? format(new Date(system.nextRevisionDate), 'MMM d, yyyy')
                         : '—'}
                       highlight={revisionDue}
-                      highlightClass={revisionOverdue ? 'text-destructive font-semibold' : 'text-amber-600 font-semibold'}
+                      highlightClass={revisionOverdue ? 'text-destructive font-semibold' : 'text-amber-500 dark:text-amber-400 font-semibold'}
                     />
                   </div>
                 )}

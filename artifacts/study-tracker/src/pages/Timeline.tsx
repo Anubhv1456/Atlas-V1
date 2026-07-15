@@ -62,12 +62,13 @@ function systemToRevisionEvent(
 }
 
 // ── Visual config ─────────────────────────────────────────────────────────────
+// Content → Blue  |  QBank → Purple  |  PYQs → Muted Gold  |  Revision → Teal
 const EVENT_STYLE: Record<TimelineEvent['eventType'], { bg: string; text: string; Icon: typeof BookOpen }> = {
-  contentCompleted: { bg: 'bg-sky-100 dark:bg-sky-900/30',       text: 'text-sky-700 dark:text-sky-400',       Icon: BookOpen },
-  qbankDone:        { bg: 'bg-violet-100 dark:bg-violet-900/30', text: 'text-violet-700 dark:text-violet-400', Icon: Layers   },
-  pyqsDone:         { bg: 'bg-amber-100 dark:bg-amber-900/30',   text: 'text-amber-700 dark:text-amber-400',   Icon: BookOpen },
-  revisionSystem:   { bg: 'bg-rose-100 dark:bg-rose-900/30',     text: 'text-rose-700 dark:text-rose-400',     Icon: Clock    },
-  revisionSubject:  { bg: 'bg-rose-100 dark:bg-rose-900/30',     text: 'text-rose-700 dark:text-rose-400',     Icon: Clock    },
+  contentCompleted: { bg: 'bg-sky-100 dark:bg-sky-900/30',          text: 'text-sky-700 dark:text-sky-400',          Icon: BookOpen },
+  qbankDone:        { bg: 'bg-violet-100 dark:bg-violet-900/30',    text: 'text-violet-700 dark:text-violet-400',    Icon: Layers   },
+  pyqsDone:         { bg: 'bg-amber-50 dark:bg-amber-950/50',       text: 'text-amber-700 dark:text-gold',           Icon: BookOpen },
+  revisionSystem:   { bg: 'bg-teal-100 dark:bg-teal-900/25',        text: 'text-teal-700 dark:text-primary',         Icon: Clock    },
+  revisionSubject:  { bg: 'bg-teal-100 dark:bg-teal-900/25',        text: 'text-teal-700 dark:text-primary',         Icon: Clock    },
 };
 
 // ── Event card ────────────────────────────────────────────────────────────────
