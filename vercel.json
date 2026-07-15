@@ -1,16 +1,9 @@
 {
-  "buildCommand": "pnpm run build && mkdir -p dist && cp -r artifacts/study-tracker/dist/* dist/",
+  "buildCommand": "pnpm --filter @workspace/study-tracker run build",
+  "outputDirectory": "artifacts/study-tracker/dist",
   "installCommand": "pnpm install",
-  "nodeVersion": "20.x",
-  "outputDirectory": "dist",
-  "routes": [
-    {
-      "src": "^/api/(.*)",
-      "dest": "/api/$1"
-    },
-    {
-      "src": "^(?!/api/).*",
-      "dest": "/index.html"
-    }
+  "framework": null,
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
